@@ -40,31 +40,7 @@ npm.cmd run app:start
 勾選 `顯示 iPad 本地筆跡預覽`：
 
 - 開：iPad 會顯示本地筆跡
-- 關：iPad 不顯示筆跡（但仍會傳到電腦繪圖）
-
-## 打包成 Windows 安裝程式
-
-```powershell
-npm.cmd run dist
-```
-
-輸出：
-
-- `release\iPad Draw Bridge Setup <version>.exe`
-
-## CLI 模式（可選）
-
-```powershell
-npm.cmd start
-```
-
-預設是安全模式（需要 token）。  
-如需無 token（不建議）：
-
-```powershell
-$env:BRIDGE_INSECURE='1'
-npm.cmd start
-```
+- 關：iPad 不顯示筆跡（仍會傳到電腦繪圖）
 
 ## 安全性
 
@@ -74,8 +50,3 @@ npm.cmd start
 - 單一 iPad 連線鎖
 - 中斷時自動放開滑鼠
 
-## 測試
-
-```powershell
-npm.cmd test
-```

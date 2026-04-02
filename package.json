@@ -1,0 +1,58 @@
+{
+  "name": "ipad-draw-bridge",
+  "version": "1.0.2",
+  "description": "Desktop app + bridge server for drawing on Windows from iPad Apple Pencil.",
+  "main": "desktop/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "app:start": "electron .",
+    "dist": "electron-builder --win nsis",
+    "test": "node --test --test-isolation=none"
+  },
+  "keywords": [
+    "ipad",
+    "apple-pencil",
+    "windows",
+    "mouse",
+    "drawing"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "koffi": "^2.8.8",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "electron": "^37.2.1",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.ipaddraw.bridge",
+    "productName": "iPad Draw Bridge",
+    "files": [
+      "desktop/**/*",
+      "public/**/*",
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

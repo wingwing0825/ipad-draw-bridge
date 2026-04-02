@@ -1,0 +1,1382 @@
+﻿<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>iPad Draw Bridge</title>
+    <style>
+      :root {
+        --bg: #050b17;
+        --surface: rgba(10, 19, 38, 0.9);
+        --border: rgba(255, 255, 255, 0.07);
+        --text: #f1f5f9;
+        --muted: #94a3b8;
+        --subtle: rgba(148, 163, 184, 0.55);
+        --ok: #10b981;
+        --warn: #f59e0b;
+        --bad: #ef4444;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Text", "PingFang TC", "Microsoft JhengHei",
+          sans-serif;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+      }
+
+      #draw {
+        width: 100vw;
+        height: 100vh;
+        display: block;
+        touch-action: none;
+      }
+
+      .hud {
+        position: fixed;
+        left: 16px;
+        top: 16px;
+        z-index: 2;
+        pointer-events: none;
+        max-width: min(88vw, 320px);
+        padding: 14px 16px;
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        backdrop-filter: blur(24px) saturate(160%);
+        -webkit-backdrop-filter: blur(24px) saturate(160%);
+        box-shadow:
+          0 12px 40px rgba(0, 0, 0, 0.5),
+          0 0 0 0.5px rgba(255, 255, 255, 0.04) inset;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+      }
+
+      .hud.hidden {
+        opacity: 0;
+        pointer-events: none;
+        transform: scale(0.98);
+      }
+
+      .hud button {
+        pointer-events: auto;
+      }
+
+      .hud-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 11px;
+      }
+
+      .hud-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #0284c7 0%, #22d3ee 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(34, 211, 238, 0.3);
+      }
+
+      .hud-title {
+        font-size: 14px;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+      }
+
+      .hud-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 0 0 11px;
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--muted);
+        margin-bottom: 9px;
+        line-height: 1.3;
+      }
+
+      .status::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: var(--muted);
+      }
+
+      .status.ok {
+        color: var(--ok);
+      }
+
+      .status.ok::before {
+        background: var(--ok);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+      }
+
+      .status.warn {
+        color: var(--warn);
+      }
+
+      .status.warn::before {
+        background: var(--warn);
+      }
+
+      .status.bad {
+        color: var(--bad);
+      }
+
+      .status.bad::before {
+        background: var(--bad);
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+      }
+
+      .info-row {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.5;
+        margin-bottom: 4px;
+      }
+
+      .hint-row {
+        font-size: 11.5px;
+        color: var(--subtle);
+        line-height: 1.55;
+        margin-bottom: 12px;
+      }
+
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .btn {
+        flex: 1;
+        padding: 9px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+        letter-spacing: -0.01em;
+        text-align: center;
+        transition: background 0.15s ease, transform 0.1s ease;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .btn:active {
+        background: rgba(255, 255, 255, 0.11);
+        transform: scale(0.97);
+      }
+
+      .btn.secondary {
+        flex: 0 0 auto;
+        padding-inline: 14px;
+      }
+
+      .token-warn {
+        margin-top: 10px;
+        padding: 9px 11px;
+        border-radius: 10px;
+        background: rgba(239, 68, 68, 0.08);
+        border: 1px solid rgba(239, 68, 68, 0.22);
+        font-size: 12px;
+        color: #fca5a5;
+        line-height: 1.55;
+      }
+
+      .debug-wrap {
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .debug-row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .debug-btn {
+        flex: 1;
+        padding: 7px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        font-size: 11.5px;
+        font-family: inherit;
+        letter-spacing: -0.01em;
+        cursor: pointer;
+      }
+
+      .debug-btn:active {
+        transform: scale(0.97);
+      }
+
+      .debug-text {
+        margin: 8px 0 0;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(2, 6, 23, 0.45);
+        color: #cbd5e1;
+        font-size: 11px;
+        line-height: 1.45;
+        font-family: Consolas, "SF Mono", Menlo, Monaco, monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .debug-text.hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="draw"></canvas>
+
+    <div id="hud" class="hud">
+      <div class="hud-header">
+        <div class="hud-icon">✏️</div>
+        <div class="hud-title">iPad Draw Bridge</div>
+      </div>
+      <div class="hud-divider"></div>
+      <div id="status" class="status warn">連線中...</div>
+      <div id="activeInfo" class="info-row">畫板尺寸讀取中...</div>
+      <div class="hint-row">雙指雙擊：清空 iPad 筆跡。雙指三擊：顯示/隱藏左上資訊。</div>
+      <div class="row">
+        <button id="clearBtn" class="btn">清空 iPad 筆跡</button>
+        <button id="fullscreenBtn" class="btn secondary">全螢幕</button>
+      </div>
+      <div id="tokenHint" class="token-warn" style="display: none">目前 URL 沒有 token，請從桌面 App 複製 iPad URL。</div>
+    </div>
+
+    <script>
+      const OPEN_SOCKET_STATE = 1;
+      const MOVE_SEND_INTERVAL_MS = 4;
+      const MOVE_BUFFER_LIMIT = 2048;
+      const MULTI_TAP_WINDOW_MS = 500;
+      const RELEASE_GUARD_START_MS = 28;
+      const RELEASE_GUARD_STABLE_MS = 14;
+      const ENABLE_TOUCH_STYLUS_FALLBACK = false;
+
+      const canvas = document.getElementById("draw");
+      const hudEl = document.getElementById("hud");
+      const statusEl = document.getElementById("status");
+      const activeInfoEl = document.getElementById("activeInfo");
+      const tokenHintEl = document.getElementById("tokenHint");
+      const clearBtn = document.getElementById("clearBtn");
+      const fullscreenBtn = document.getElementById("fullscreenBtn");
+      const debugTextEl = null;
+      const ctx = canvas.getContext("2d", { alpha: true });
+
+      let socket = null;
+      let reconnectTimer = null;
+      let activePointerId = null;
+      let activeTouchId = null;
+      let activeInputSource = null;
+      let pendingMoveEvent = null;
+      let pendingMoveTimer = 0;
+      let lastMoveSentAt = 0;
+      let activeStrokeId = 0;
+      let strokeStartedAt = 0;
+      let zeroPressureSince = 0;
+      let strokeIdCounter = 0;
+      let debugVisible = false;
+      let debugRenderPending = false;
+      let debugLastEventAt = 0;
+      let debugTicker = null;
+
+      const debugStats = {
+        rawPointerDownPen: 0,
+        rawPointerDownTouch: 0,
+        rawPointerDownMouse: 0,
+        rawPointerDownOther: 0,
+        rawPointerMovePen: 0,
+        rawPointerMoveTouch: 0,
+        rawPointerMoveMouse: 0,
+        rawPointerMoveOther: 0,
+        rawPointerUpPen: 0,
+        rawPointerUpTouch: 0,
+        rawPointerUpMouse: 0,
+        rawPointerUpOther: 0,
+        rawPointerCancelPen: 0,
+        rawPointerCancelTouch: 0,
+        rawPointerCancelMouse: 0,
+        rawPointerCancelOther: 0,
+        pointerDown: 0,
+        pointerMove: 0,
+        pointerUp: 0,
+        pointerCancel: 0,
+        ignoredPointerDownNonPen: 0,
+        ignoredPointerMoveNonPen: 0,
+        pointerTargetHud: 0,
+        touchStartStylus: 0,
+        touchMoveStylus: 0,
+        touchEndStylus: 0,
+        touchCancelStylus: 0,
+        touchStartNonStylus: 0,
+        sendDown: 0,
+        sendMove: 0,
+        sendUp: 0,
+        sendCancel: 0,
+        sendDropped: 0,
+        recoveredFromMove: 0,
+        recoveredFromRaw: 0,
+        releaseCalls: 0,
+        wsOpen: 0,
+        wsClose: 0,
+        wsError: 0,
+        wsReady: 0,
+        wsRegionPush: 0
+      };
+
+      let canvasWidth = window.innerWidth;
+      let canvasHeight = window.innerHeight;
+      let activeRect = { x: 0, y: 0, width: canvasWidth, height: canvasHeight };
+      let mappingRegion = null;
+      let previewEnabled = true;
+      let hudHidden = false;
+      let lastViewPoint = null;
+      let lastActivePoint = null;
+      let lastTwoFingerTapAt = 0;
+      let twoFingerTapCount = 0;
+      let twoFingerTapTimer = null;
+
+      const token = new URLSearchParams(window.location.search).get("token") || "";
+      if (!token) {
+        tokenHintEl.style.display = "block";
+      }
+
+      function setStatus(text, mode) {
+        statusEl.textContent = text;
+        statusEl.className = `status ${mode}`;
+      }
+
+      function bumpDebugCounter(key) {
+        if (!Object.prototype.hasOwnProperty.call(debugStats, key)) {
+          return;
+        }
+        debugStats[key] += 1;
+        debugLastEventAt = Date.now();
+        scheduleDebugRender();
+      }
+
+      function resetDebugStats() {
+        for (const key of Object.keys(debugStats)) {
+          debugStats[key] = 0;
+        }
+        debugLastEventAt = Date.now();
+        scheduleDebugRender();
+      }
+
+      function formatElapsed(ms) {
+        if (!Number.isFinite(ms) || ms < 0) {
+          return "-";
+        }
+        if (ms < 1000) {
+          return `${Math.round(ms)}ms`;
+        }
+        return `${(ms / 1000).toFixed(2)}s`;
+      }
+
+      function getSourceLabel() {
+        if (!activeInputSource) {
+          return "none";
+        }
+        if (activeInputSource === "pointer") {
+          return `pointer(${activePointerId ?? "-"})`;
+        }
+        if (activeInputSource === "touch") {
+          return `touch(${activeTouchId ?? "-"})`;
+        }
+        return String(activeInputSource);
+      }
+
+      function classifyPointerType(event) {
+        const type = typeof event.pointerType === "string" ? event.pointerType.toLowerCase() : "";
+        if (type === "pen") {
+          return "Pen";
+        }
+        if (type === "touch") {
+          return "Touch";
+        }
+        if (type === "mouse") {
+          return "Mouse";
+        }
+        return "Other";
+      }
+
+      function bumpRawPointer(kind, event) {
+        const suffix = classifyPointerType(event);
+        bumpDebugCounter(`rawPointer${kind}${suffix}`);
+      }
+
+      function getEventTargetNode(event) {
+        const target = event && event.target;
+        return target instanceof Node ? target : null;
+      }
+
+      function isEventFromHud(event) {
+        const targetNode = getEventTargetNode(event);
+        return Boolean(targetNode && hudEl.contains(targetNode));
+      }
+
+      function renderDebugHud() {
+        debugRenderPending = false;
+        if (!debugVisible || !debugTextEl) {
+          return;
+        }
+
+        const socketState = socket ? socket.readyState : 3;
+        const socketBuffer = socket && Number.isFinite(socket.bufferedAmount) ? socket.bufferedAmount : 0;
+        const lastEventAgo =
+          debugLastEventAt > 0 ? formatElapsed(Date.now() - debugLastEventAt) : "-";
+
+        debugTextEl.textContent =
+          `RawDown p:${debugStats.rawPointerDownPen} t:${debugStats.rawPointerDownTouch} m:${debugStats.rawPointerDownMouse} o:${debugStats.rawPointerDownOther}\n` +
+          `RawMove p:${debugStats.rawPointerMovePen} t:${debugStats.rawPointerMoveTouch} m:${debugStats.rawPointerMoveMouse} o:${debugStats.rawPointerMoveOther}\n` +
+          `RawUp   p:${debugStats.rawPointerUpPen} t:${debugStats.rawPointerUpTouch} m:${debugStats.rawPointerUpMouse} o:${debugStats.rawPointerUpOther}\n` +
+          `RawCan  p:${debugStats.rawPointerCancelPen} t:${debugStats.rawPointerCancelTouch} m:${debugStats.rawPointerCancelMouse} o:${debugStats.rawPointerCancelOther}\n` +
+          `Pointer  d:${debugStats.pointerDown}  m:${debugStats.pointerMove}  u:${debugStats.pointerUp}  c:${debugStats.pointerCancel}\n` +
+          `StylusT  s:${debugStats.touchStartStylus}  m:${debugStats.touchMoveStylus}  e:${debugStats.touchEndStylus}  c:${debugStats.touchCancelStylus}\n` +
+          `Sent     d:${debugStats.sendDown}  m:${debugStats.sendMove}  u:${debugStats.sendUp}  c:${debugStats.sendCancel}  drop:${debugStats.sendDropped}\n` +
+          `Filter   pdNonPen:${debugStats.ignoredPointerDownNonPen} pmNonPen:${debugStats.ignoredPointerMoveNonPen} hud:${debugStats.pointerTargetHud} touchNonStylus:${debugStats.touchStartNonStylus}\n` +
+          `Recover  fromMove:${debugStats.recoveredFromMove} fromRaw:${debugStats.recoveredFromRaw} release:${debugStats.releaseCalls}\n` +
+          `Socket   open:${debugStats.wsOpen} close:${debugStats.wsClose} err:${debugStats.wsError} ready:${debugStats.wsReady} region:${debugStats.wsRegionPush}\n` +
+          `Runtime  source:${getSourceLabel()} stroke:${activeStrokeId || "-"} tfb:${ENABLE_TOUCH_STYLUS_FALLBACK ? 1 : 0} wsState:${socketState} wsBuf:${socketBuffer} last:${lastEventAgo}`;
+      }
+
+      function scheduleDebugRender() {
+        if (!debugVisible || !debugTextEl) {
+          return;
+        }
+        if (debugRenderPending) {
+          return;
+        }
+        debugRenderPending = true;
+        requestAnimationFrame(renderDebugHud);
+      }
+
+      function setDebugVisible(visible) {
+        debugVisible = Boolean(visible);
+        if (debugVisible && debugTextEl) {
+          scheduleDebugRender();
+        }
+      }
+
+      function startDebugTicker() {
+        if (debugTicker || !debugVisible || !debugTextEl) {
+          return;
+        }
+        debugTicker = setInterval(() => {
+          if (!debugVisible) {
+            return;
+          }
+          scheduleDebugRender();
+        }, 250);
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function nextStrokeId() {
+        strokeIdCounter += 1;
+        if (strokeIdCounter > 2147483646) {
+          strokeIdCounter = 1;
+        }
+        return strokeIdCounter;
+      }
+
+      function getViewportSize() {
+        if (window.visualViewport) {
+          const width = Number(window.visualViewport.width);
+          const height = Number(window.visualViewport.height);
+          if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+            return {
+              width: Math.round(width),
+              height: Math.round(height)
+            };
+          }
+        }
+
+        return {
+          width: window.innerWidth,
+          height: window.innerHeight
+        };
+      }
+
+      function normalizeRegionPayload(region) {
+        if (!region || typeof region !== "object") {
+          return null;
+        }
+
+        const x = Number(region.x);
+        const y = Number(region.y);
+        const width = Number(region.width);
+        const height = Number(region.height);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+          return null;
+        }
+        if (width <= 0 || height <= 0) {
+          return null;
+        }
+
+        return {
+          x: Math.round(x),
+          y: Math.round(y),
+          width: Math.round(width),
+          height: Math.round(height)
+        };
+      }
+
+      function snapActiveRect(nextRect) {
+        const width = Math.max(1, Math.round(nextRect.width));
+        const height = Math.max(1, Math.round(nextRect.height));
+
+        return {
+          x: clamp(Math.round(nextRect.x), 0, Math.max(0, canvasWidth - width)),
+          y: clamp(Math.round(nextRect.y), 0, Math.max(0, canvasHeight - height)),
+          width,
+          height
+        };
+      }
+
+      function getTargetAspectRatio() {
+        if (mappingRegion && mappingRegion.width > 0 && mappingRegion.height > 0) {
+          return mappingRegion.width / mappingRegion.height;
+        }
+        return canvasWidth / Math.max(1, canvasHeight);
+      }
+
+      function recomputeActiveRect() {
+        const targetRatio = getTargetAspectRatio();
+        const viewportRatio = canvasWidth / Math.max(1, canvasHeight);
+
+        if (!Number.isFinite(targetRatio) || targetRatio <= 0) {
+          activeRect = { x: 0, y: 0, width: canvasWidth, height: canvasHeight };
+          return;
+        }
+
+        if (viewportRatio > targetRatio) {
+          const width = canvasHeight * targetRatio;
+          activeRect = snapActiveRect({
+            x: (canvasWidth - width) / 2,
+            y: 0,
+            width,
+            height: canvasHeight
+          });
+          return;
+        }
+
+        const height = canvasWidth / targetRatio;
+        activeRect = snapActiveRect({
+          x: 0,
+          y: (canvasHeight - height) / 2,
+          width: canvasWidth,
+          height
+        });
+      }
+
+      function updateActiveInfo() {
+        const boardW = activeRect.width;
+        const boardH = activeRect.height;
+
+        if (mappingRegion) {
+          activeInfoEl.textContent = `iPad 畫板 ${boardW}x${boardH}，對應電腦 ${mappingRegion.width}x${mappingRegion.height}`;
+          return;
+        }
+
+        activeInfoEl.textContent = `iPad 畫板 ${boardW}x${boardH}`;
+      }
+
+      function redrawBoard() {
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.12)";
+        ctx.lineWidth = 1;
+        for (let x = 0; x < canvasWidth; x += 24) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvasHeight);
+          ctx.stroke();
+        }
+        for (let y = 0; y < canvasHeight; y += 24) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvasWidth, y);
+          ctx.stroke();
+        }
+
+        const fullWidth = Math.abs(activeRect.width - canvasWidth) < 0.5;
+        const fullHeight = Math.abs(activeRect.height - canvasHeight) < 0.5;
+
+        if (!fullWidth || !fullHeight) {
+          ctx.fillStyle = "rgba(15, 23, 42, 0.5)";
+          ctx.fillRect(0, 0, canvasWidth, activeRect.y);
+          ctx.fillRect(0, activeRect.y + activeRect.height, canvasWidth, canvasHeight - (activeRect.y + activeRect.height));
+          ctx.fillRect(0, activeRect.y, activeRect.x, activeRect.height);
+          ctx.fillRect(
+            activeRect.x + activeRect.width,
+            activeRect.y,
+            canvasWidth - (activeRect.x + activeRect.width),
+            activeRect.height
+          );
+        }
+
+        ctx.strokeStyle = "rgba(34, 211, 238, 0.95)";
+        ctx.lineWidth = 2;
+
+        if (activeRect.width > 2 && activeRect.height > 2) {
+          ctx.strokeRect(activeRect.x + 1, activeRect.y + 1, activeRect.width - 2, activeRect.height - 2);
+        } else {
+          ctx.strokeRect(activeRect.x, activeRect.y, activeRect.width, activeRect.height);
+        }
+
+        updateActiveInfo();
+      }
+
+      function resizeCanvas() {
+        const viewport = getViewportSize();
+        const ratio = window.devicePixelRatio || 1;
+
+        canvasWidth = Math.max(1, viewport.width);
+        canvasHeight = Math.max(1, viewport.height);
+
+        canvas.width = Math.floor(canvasWidth * ratio);
+        canvas.height = Math.floor(canvasHeight * ratio);
+        canvas.style.width = `${canvasWidth}px`;
+        canvas.style.height = `${canvasHeight}px`;
+
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+        recomputeActiveRect();
+        redrawBoard();
+      }
+
+      function clearLocalStrokes() {
+        redrawBoard();
+      }
+
+      function setPreviewMode(enabled) {
+        previewEnabled = Boolean(enabled);
+        if (!previewEnabled) {
+          clearLocalStrokes();
+        }
+      }
+
+      function applyRegion(region) {
+        mappingRegion = normalizeRegionPayload(region);
+        recomputeActiveRect();
+        clearLocalStrokes();
+      }
+
+      function sendEvent(type, activePoint, strokeId = activeStrokeId) {
+        if (!socket || socket.readyState !== OPEN_SOCKET_STATE || !activePoint) {
+          bumpDebugCounter("sendDropped");
+          return false;
+        }
+
+        const safeStrokeId = Number.isFinite(Number(strokeId)) ? Math.max(0, Math.trunc(Number(strokeId))) : 0;
+
+        socket.send(
+          `${type}|${Math.round(activePoint.x)}|${Math.round(activePoint.y)}|${activeRect.width}|${activeRect.height}|${safeStrokeId}`
+        );
+
+        if (type === "d") bumpDebugCounter("sendDown");
+        if (type === "m") bumpDebugCounter("sendMove");
+        if (type === "u") bumpDebugCounter("sendUp");
+        if (type === "c") bumpDebugCounter("sendCancel");
+
+        return true;
+      }
+
+      function clearPendingMoveTimer() {
+        if (!pendingMoveTimer) {
+          return;
+        }
+        clearTimeout(pendingMoveTimer);
+        pendingMoveTimer = 0;
+      }
+
+      function scheduleQueuedMove(delayMs) {
+        if (pendingMoveTimer) {
+          return;
+        }
+
+        pendingMoveTimer = setTimeout(() => {
+          pendingMoveTimer = 0;
+          flushQueuedMove(false);
+        }, Math.max(1, Math.round(delayMs)));
+      }
+
+      function flushQueuedMove(force) {
+        if (!pendingMoveEvent) {
+          return;
+        }
+
+        const elapsed = performance.now() - lastMoveSentAt;
+        if (!force && elapsed < MOVE_SEND_INTERVAL_MS) {
+          scheduleQueuedMove(MOVE_SEND_INTERVAL_MS - elapsed);
+          return;
+        }
+
+        if (!force && socket && socket.readyState === OPEN_SOCKET_STATE && socket.bufferedAmount > MOVE_BUFFER_LIMIT) {
+          scheduleQueuedMove(MOVE_SEND_INTERVAL_MS);
+          return;
+        }
+
+        if (sendEvent("m", pendingMoveEvent.point, pendingMoveEvent.strokeId)) {
+          lastMoveSentAt = performance.now();
+          pendingMoveEvent = null;
+        }
+      }
+
+      function queueMoveSend(activePoint, force) {
+        pendingMoveEvent = {
+          point: activePoint,
+          strokeId: activeStrokeId
+        };
+        if (force) {
+          clearPendingMoveTimer();
+          flushQueuedMove(true);
+          return;
+        }
+        flushQueuedMove(false);
+      }
+
+      function getViewPoint(event) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top
+        };
+      }
+
+      function clampViewPointToActive(point) {
+        return {
+          x: clamp(point.x, activeRect.x, activeRect.x + activeRect.width),
+          y: clamp(point.y, activeRect.y, activeRect.y + activeRect.height)
+        };
+      }
+
+      function toActivePoint(viewPoint) {
+        return {
+          x: viewPoint.x - activeRect.x,
+          y: viewPoint.y - activeRect.y
+        };
+      }
+
+      function getTouchPoint(touch) {
+        return {
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        };
+      }
+
+      function findStylusTouch(touchList, preferredId) {
+        if (!touchList) {
+          return null;
+        }
+
+        for (let i = 0; i < touchList.length; i += 1) {
+          const touch = touchList[i];
+          if (!touch || touch.touchType !== "stylus") {
+            continue;
+          }
+          if (preferredId === undefined || preferredId === null || touch.identifier === preferredId) {
+            return touch;
+          }
+        }
+
+        return null;
+      }
+
+      function isApplePencil(event) {
+        return event.pointerType === "pen";
+      }
+
+      function startStrokeAtViewPoint(viewPoint) {
+        const activePoint = toActivePoint(viewPoint);
+        activeStrokeId = nextStrokeId();
+        strokeStartedAt = performance.now();
+        zeroPressureSince = 0;
+
+        lastViewPoint = viewPoint;
+        lastActivePoint = activePoint;
+        pendingMoveEvent = null;
+        clearPendingMoveTimer();
+        lastMoveSentAt = 0;
+
+        // Start stroke directly; server side already guards stale press state.
+        sendEvent("d", activePoint, activeStrokeId);
+        scheduleDebugRender();
+      }
+
+      function moveStrokeAtViewPoint(viewPoint) {
+        const activePoint = toActivePoint(viewPoint);
+        zeroPressureSince = 0;
+        if (lastViewPoint) {
+          drawSegment(lastViewPoint, viewPoint);
+        }
+
+        lastViewPoint = viewPoint;
+        lastActivePoint = activePoint;
+        queueMoveSend(activePoint, false);
+      }
+
+      function finishStrokeAtViewPoint(viewPoint, type) {
+        const activePoint = toActivePoint(viewPoint);
+        queueMoveSend(activePoint, true);
+        sendEvent(type, activePoint, activeStrokeId);
+      }
+
+      function clearActiveInputState() {
+        activeInputSource = null;
+        activePointerId = null;
+        activeTouchId = null;
+        pendingMoveEvent = null;
+        clearPendingMoveTimer();
+        lastViewPoint = null;
+        lastActivePoint = null;
+        lastMoveSentAt = 0;
+        activeStrokeId = 0;
+        strokeStartedAt = 0;
+        zeroPressureSince = 0;
+        scheduleDebugRender();
+      }
+
+      function drawSegment(from, to) {
+        if (!previewEnabled) {
+          return;
+        }
+
+        ctx.strokeStyle = "rgba(34, 211, 238, 0.95)";
+        ctx.lineWidth = 2;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.stroke();
+      }
+
+      function getPointerSamples(event) {
+        if (typeof event.getCoalescedEvents === "function") {
+          const samples = event.getCoalescedEvents();
+          if (Array.isArray(samples) && samples.length > 0) {
+            return samples;
+          }
+        }
+        return [event];
+      }
+
+      function hasPressedPenSignal(event) {
+        const pressure = Number(event.pressure) || 0;
+        const buttons = Number(event.buttons) || 0;
+        return pressure > 0 || buttons > 0;
+      }
+
+      function trySetPointerCapture(pointerId) {
+        if (!Number.isFinite(Number(pointerId)) || typeof canvas.setPointerCapture !== "function") {
+          return;
+        }
+        try {
+          canvas.setPointerCapture(pointerId);
+        } catch {
+          // Ignore capture failures from browser quirks.
+        }
+      }
+
+      function tryReleasePointerCapture(pointerId) {
+        if (!Number.isFinite(Number(pointerId)) || typeof canvas.releasePointerCapture !== "function") {
+          return;
+        }
+        try {
+          if (typeof canvas.hasPointerCapture === "function" && !canvas.hasPointerCapture(pointerId)) {
+            return;
+          }
+          canvas.releasePointerCapture(pointerId);
+        } catch {
+          // Ignore release failures from browser quirks.
+        }
+      }
+
+      function beginPointerStrokeFromEvent(event, recoverCounter) {
+        const rawStartPoint = getViewPoint(event);
+        const startViewPoint = clampViewPointToActive(rawStartPoint);
+        activeInputSource = "pointer";
+        activePointerId = event.pointerId;
+        trySetPointerCapture(event.pointerId);
+        if (recoverCounter) {
+          bumpDebugCounter(recoverCounter);
+        }
+        startStrokeAtViewPoint(startViewPoint);
+      }
+
+      function releaseStrokeIfNeeded() {
+        if (activeInputSource === null) {
+          return;
+        }
+        bumpDebugCounter("releaseCalls");
+
+        if (lastActivePoint) {
+          queueMoveSend(lastActivePoint, true);
+          sendEvent("c", lastActivePoint, activeStrokeId);
+        }
+
+        if (activeInputSource === "pointer" && activePointerId !== null) {
+          tryReleasePointerCapture(activePointerId);
+        }
+
+        clearActiveInputState();
+      }
+
+      function onPointerDown(event) {
+        bumpRawPointer("Down", event);
+
+        if (!isApplePencil(event)) {
+          bumpDebugCounter("ignoredPointerDownNonPen");
+          return;
+        }
+
+        if (activeInputSource === null && isEventFromHud(event)) {
+          bumpDebugCounter("pointerTargetHud");
+          return;
+        }
+
+        bumpDebugCounter("pointerDown");
+        event.preventDefault();
+
+        if (activeInputSource !== null) {
+          releaseStrokeIfNeeded();
+        }
+
+        beginPointerStrokeFromEvent(event, null);
+      }
+
+      function onPointerMove(event) {
+        bumpRawPointer("Move", event);
+        bumpDebugCounter("pointerMove");
+
+        if (!isApplePencil(event)) {
+          bumpDebugCounter("ignoredPointerMoveNonPen");
+          return;
+        }
+
+        if (activeInputSource === null) {
+          if (!hasPressedPenSignal(event)) {
+            return;
+          }
+          event.preventDefault();
+          beginPointerStrokeFromEvent(event, "recoveredFromMove");
+        }
+
+        if (activeInputSource === "touch") {
+          if (!hasPressedPenSignal(event)) {
+            return;
+          }
+          event.preventDefault();
+          releaseStrokeIfNeeded();
+          beginPointerStrokeFromEvent(event, "recoveredFromMove");
+        }
+
+        if (activeInputSource === "pointer" && event.pointerId !== activePointerId) {
+          if (!hasPressedPenSignal(event)) {
+            return;
+          }
+          event.preventDefault();
+          releaseStrokeIfNeeded();
+          beginPointerStrokeFromEvent(event, "recoveredFromMove");
+        }
+
+        if (activeInputSource !== "pointer" || event.pointerId !== activePointerId) {
+          return;
+        }
+
+        event.preventDefault();
+
+        if (!hasPressedPenSignal(event)) {
+          const now = performance.now();
+          if (strokeStartedAt > 0 && now - strokeStartedAt < RELEASE_GUARD_START_MS) {
+            return;
+          }
+          if (!zeroPressureSince) {
+            zeroPressureSince = now;
+            return;
+          }
+          if (now - zeroPressureSince < RELEASE_GUARD_STABLE_MS) {
+            return;
+          }
+
+          const rawPoint = getViewPoint(event);
+          const viewPoint = clampViewPointToActive(rawPoint);
+          finishStrokeAtViewPoint(viewPoint, "u");
+          tryReleasePointerCapture(event.pointerId);
+          bumpDebugCounter("pointerUp");
+          clearActiveInputState();
+          return;
+        }
+        zeroPressureSince = 0;
+
+        const samples = getPointerSamples(event);
+        for (const sample of samples) {
+          const rawPoint = getViewPoint(sample);
+          const viewPoint = clampViewPointToActive(rawPoint);
+          moveStrokeAtViewPoint(viewPoint);
+        }
+      }
+
+      function onPointerRawUpdate(event) {
+        bumpRawPointer("Move", event);
+
+        if (!isApplePencil(event)) {
+          return;
+        }
+
+        if (activeInputSource === "pointer" && event.pointerId === activePointerId) {
+          if (!hasPressedPenSignal(event)) {
+            return;
+          }
+          event.preventDefault();
+          const rawPoint = getViewPoint(event);
+          const viewPoint = clampViewPointToActive(rawPoint);
+          moveStrokeAtViewPoint(viewPoint);
+          return;
+        }
+
+        if (activeInputSource !== null) {
+          return;
+        }
+        if (!hasPressedPenSignal(event)) {
+          return;
+        }
+
+        event.preventDefault();
+        beginPointerStrokeFromEvent(event, "recoveredFromRaw");
+      }
+
+      function finishPointer(event, type) {
+        if (type === "u") {
+          bumpRawPointer("Up", event);
+        } else {
+          bumpRawPointer("Cancel", event);
+        }
+
+        if (activeInputSource !== "pointer" || event.pointerId !== activePointerId) {
+          return;
+        }
+
+        event.preventDefault();
+
+        const rawPoint = getViewPoint(event);
+        const viewPoint = clampViewPointToActive(rawPoint);
+        finishStrokeAtViewPoint(viewPoint, type);
+
+        tryReleasePointerCapture(event.pointerId);
+
+        if (type === "u") {
+          bumpDebugCounter("pointerUp");
+        } else {
+          bumpDebugCounter("pointerCancel");
+        }
+
+        clearActiveInputState();
+      }
+
+      function toggleHudVisibility() {
+        hudHidden = !hudHidden;
+        hudEl.classList.toggle("hidden", hudHidden);
+      }
+
+      function isFullscreenActive() {
+        return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+      }
+
+      function updateFullscreenButton() {
+        fullscreenBtn.textContent = isFullscreenActive() ? "退出全螢幕" : "全螢幕";
+      }
+
+      async function requestFullscreenMode() {
+        const root = document.documentElement;
+        if (root.requestFullscreen) {
+          await root.requestFullscreen({ navigationUI: "hide" });
+          return true;
+        }
+        if (root.webkitRequestFullscreen) {
+          root.webkitRequestFullscreen();
+          return true;
+        }
+        return false;
+      }
+
+      async function exitFullscreenMode() {
+        if (document.exitFullscreen && document.fullscreenElement) {
+          await document.exitFullscreen();
+          return true;
+        }
+        if (document.webkitExitFullscreen && document.webkitFullscreenElement) {
+          document.webkitExitFullscreen();
+          return true;
+        }
+        return false;
+      }
+
+      async function toggleFullscreenMode() {
+        try {
+          if (isFullscreenActive()) {
+            await exitFullscreenMode();
+            updateFullscreenButton();
+            return;
+          }
+
+          const ok = await requestFullscreenMode();
+          updateFullscreenButton();
+          if (!ok) {
+            setStatus("此瀏覽器不支援網頁全螢幕。可改用加入主畫面後打開。", "warn");
+          }
+        } catch {
+          setStatus("無法切換全螢幕", "warn");
+        }
+      }
+
+      function handleTwoFingerTap(event) {
+        if (event.touches.length !== 2) {
+          return;
+        }
+
+        event.preventDefault();
+
+        const now = Date.now();
+        if (now - lastTwoFingerTapAt > MULTI_TAP_WINDOW_MS) {
+          twoFingerTapCount = 0;
+        }
+        lastTwoFingerTapAt = now;
+
+        twoFingerTapCount += 1;
+
+        if (twoFingerTapTimer) {
+          clearTimeout(twoFingerTapTimer);
+          twoFingerTapTimer = null;
+        }
+
+        if (twoFingerTapCount >= 3) {
+          twoFingerTapCount = 0;
+          toggleHudVisibility();
+          return;
+        }
+
+        twoFingerTapTimer = setTimeout(() => {
+          if (twoFingerTapCount === 2) {
+            clearLocalStrokes();
+          }
+          twoFingerTapCount = 0;
+          twoFingerTapTimer = null;
+        }, MULTI_TAP_WINDOW_MS);
+      }
+
+      function onTouchStart(event) {
+        const stylusTouch = findStylusTouch(event.changedTouches, null);
+        if (stylusTouch) {
+          bumpDebugCounter("touchStartStylus");
+          if (!ENABLE_TOUCH_STYLUS_FALLBACK) {
+            event.preventDefault();
+            return;
+          }
+          if (activeInputSource === "pointer") {
+            return;
+          }
+
+          event.preventDefault();
+          const rawPoint = getViewPoint(getTouchPoint(stylusTouch));
+          const viewPoint = clampViewPointToActive(rawPoint);
+
+          if (activeInputSource !== null) {
+            releaseStrokeIfNeeded();
+          }
+
+          activeInputSource = "touch";
+          activeTouchId = stylusTouch.identifier;
+          startStrokeAtViewPoint(viewPoint);
+          return;
+        }
+
+        bumpDebugCounter("touchStartNonStylus");
+        handleTwoFingerTap(event);
+      }
+
+      function onTouchMove(event) {
+        if (!ENABLE_TOUCH_STYLUS_FALLBACK) {
+          return;
+        }
+        if (activeInputSource !== "touch") {
+          return;
+        }
+
+        const stylusTouch =
+          findStylusTouch(event.changedTouches, activeTouchId) || findStylusTouch(event.touches, activeTouchId);
+        if (!stylusTouch) {
+          return;
+        }
+
+        bumpDebugCounter("touchMoveStylus");
+        event.preventDefault();
+        const rawPoint = getViewPoint(getTouchPoint(stylusTouch));
+        const viewPoint = clampViewPointToActive(rawPoint);
+        moveStrokeAtViewPoint(viewPoint);
+      }
+
+      function finishTouch(event, type) {
+        if (!ENABLE_TOUCH_STYLUS_FALLBACK) {
+          return;
+        }
+        if (activeInputSource !== "touch") {
+          return;
+        }
+
+        const stylusTouch = findStylusTouch(event.changedTouches, activeTouchId);
+        if (!stylusTouch) {
+          return;
+        }
+
+        if (type === "u") {
+          bumpDebugCounter("touchEndStylus");
+        } else {
+          bumpDebugCounter("touchCancelStylus");
+        }
+
+        event.preventDefault();
+        const rawPoint = getViewPoint(getTouchPoint(stylusTouch));
+        const viewPoint = clampViewPointToActive(rawPoint);
+        finishStrokeAtViewPoint(viewPoint, type);
+        clearActiveInputState();
+      }
+
+      function connectSocket() {
+        clearTimeout(reconnectTimer);
+
+        const proto = window.location.protocol === "https:" ? "wss" : "ws";
+        const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : "";
+        socket = new WebSocket(`${proto}://${window.location.host}/ws${tokenQuery}`);
+
+        socket.addEventListener("open", () => {
+          bumpDebugCounter("wsOpen");
+          setStatus("已連線，等待畫筆輸入", "ok");
+        });
+
+        socket.addEventListener("message", (event) => {
+          try {
+            const data = JSON.parse(event.data);
+
+            if (data.type === "busy") {
+              setStatus("已有其他 iPad 連線中", "bad");
+              return;
+            }
+
+            if (data.type === "ready") {
+              bumpDebugCounter("wsReady");
+              applyRegion(data.region || null);
+
+              if (Object.prototype.hasOwnProperty.call(data, "previewEnabled")) {
+                setPreviewMode(Boolean(data.previewEnabled));
+              }
+
+              const region = normalizeRegionPayload(data.region);
+              if (region) {
+                setStatus(`已就緒，電腦區域 ${region.width}x${region.height}`, "ok");
+              } else {
+                setStatus("已就緒，使用全螢幕映射", "ok");
+              }
+              return;
+            }
+
+            if (data.type === "region") {
+              bumpDebugCounter("wsRegionPush");
+              applyRegion(data.region || null);
+              return;
+            }
+
+            if (data.type === "preview") {
+              setPreviewMode(Boolean(data.enabled));
+            }
+          } catch {
+            // Ignore malformed message.
+          }
+        });
+
+        socket.addEventListener("close", () => {
+          bumpDebugCounter("wsClose");
+          releaseStrokeIfNeeded();
+          setStatus("連線中斷，嘗試重連...", "bad");
+          reconnectTimer = setTimeout(connectSocket, 1000);
+        });
+
+        socket.addEventListener("error", () => {
+          bumpDebugCounter("wsError");
+          setStatus("連線錯誤", "bad");
+        });
+      }
+
+      const pointerListenerOptions = { capture: true };
+      const touchListenerOptions = { capture: true, passive: false };
+
+      window.addEventListener("pointerdown", onPointerDown, pointerListenerOptions);
+      window.addEventListener("pointermove", onPointerMove, pointerListenerOptions);
+      window.addEventListener("pointerrawupdate", onPointerRawUpdate, pointerListenerOptions);
+      window.addEventListener("pointerup", (event) => finishPointer(event, "u"), pointerListenerOptions);
+      window.addEventListener("pointercancel", (event) => finishPointer(event, "c"), pointerListenerOptions);
+
+      window.addEventListener("touchstart", onTouchStart, touchListenerOptions);
+      window.addEventListener("touchmove", onTouchMove, touchListenerOptions);
+      window.addEventListener("touchend", (event) => finishTouch(event, "u"), touchListenerOptions);
+      window.addEventListener("touchcancel", (event) => finishTouch(event, "c"), touchListenerOptions);
+
+      clearBtn.addEventListener("click", clearLocalStrokes);
+      fullscreenBtn.addEventListener("click", () => {
+        toggleFullscreenMode();
+      });
+      document.addEventListener("fullscreenchange", updateFullscreenButton);
+      document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          releaseStrokeIfNeeded();
+        }
+      });
+
+      window.addEventListener("blur", releaseStrokeIfNeeded);
+      window.addEventListener("pagehide", releaseStrokeIfNeeded);
+      window.addEventListener("resize", resizeCanvas);
+
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", resizeCanvas);
+        window.visualViewport.addEventListener("scroll", resizeCanvas);
+      }
+
+      resizeCanvas();
+      updateFullscreenButton();
+      setDebugVisible(false);
+      resetDebugStats();
+      startDebugTicker();
+      connectSocket();
+    </script>
+  </body>
+</html>

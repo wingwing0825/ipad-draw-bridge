@@ -1,0 +1,7 @@
+node_modules/
+release/
+bridge-state.json
+*.log
+.env
+.env.*
+

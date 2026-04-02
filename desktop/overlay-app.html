@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Draw Region Overlay</title>
+    <style>
+      :root {
+        --mask: rgba(4, 9, 22, 0.54);
+        --cyan: #22d3ee;
+        --cyan-strong: #0ea5e9;
+        --panel: rgba(9, 16, 32, 0.95);
+        --border: rgba(255, 255, 255, 0.08);
+        --border-strong: rgba(255, 255, 255, 0.13);
+        --text: #f1f5f9;
+        --muted: #8b9ab5;
+        --subtle: rgba(139, 154, 181, 0.5);
+        --accent: #3b82f6;
+        --danger-dim: rgba(239, 68, 68, 0.1);
+        --danger-border: rgba(239, 68, 68, 0.28);
+      }
+
+      * {
+        box-sizing: border-box;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Text",
+          "PingFang TC", "Microsoft JhengHei", sans-serif;
+        color: var(--text);
+        background: transparent;
+      }
+
+      /* ─── Stage ─── */
+      #stage {
+        position: fixed;
+        inset: 0;
+        background: var(--mask);
+      }
+
+      /* ─── Selection hole ─── */
+      #hole {
+        position: absolute;
+        border: 2px solid var(--cyan);
+        box-shadow:
+          0 0 0 99999px rgba(4, 9, 22, 0.56),
+          0 0 24px rgba(34, 211, 238, 0.12),
+          inset 0 0 40px rgba(34, 211, 238, 0.04);
+        cursor: move;
+        border-radius: 2px;
+      }
+
+      #hole::after {
+        content: attr(data-dim);
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 0;
+        font-size: 12px;
+        font-weight: 500;
+        font-family: "SF Mono", Consolas, monospace;
+        color: var(--cyan);
+        background: rgba(9, 16, 32, 0.9);
+        border: 1px solid rgba(34, 211, 238, 0.25);
+        padding: 3px 8px;
+        border-radius: 6px;
+        white-space: nowrap;
+        pointer-events: none;
+      }
+
+      /* Reselect mode cursors */
+      body.reselect #stage { cursor: crosshair; }
+      body.reselect #hole  {
+        cursor: crosshair;
+        border-color: var(--cyan-strong);
+        box-shadow:
+          0 0 0 99999px rgba(4, 9, 22, 0.56),
+          0 0 30px rgba(14, 165, 233, 0.2);
+      }
+      body.reselect .handle { opacity: 0.25; }
+
+      /* ─── Handles ─── */
+      .handle {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.9);
+        background: var(--cyan);
+        box-shadow: 0 0 8px rgba(34, 211, 238, 0.45);
+        transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.2s ease;
+      }
+
+      .handle:hover { transform: scale(1.35); box-shadow: 0 0 14px rgba(34, 211, 238, 0.7); }
+
+      .nw { left: -6px;  top: -6px;    cursor: nwse-resize; }
+      .ne { right: -6px; top: -6px;    cursor: nesw-resize; }
+      .sw { left: -6px;  bottom: -6px; cursor: nesw-resize; }
+      .se { right: -6px; bottom: -6px; cursor: nwse-resize; }
+      .n  { left: calc(50% - 6px); top: -6px;    cursor: ns-resize; }
+      .s  { left: calc(50% - 6px); bottom: -6px; cursor: ns-resize; }
+      .w  { left: -6px;  top: calc(50% - 6px);   cursor: ew-resize; }
+      .e  { right: -6px; top: calc(50% - 6px);   cursor: ew-resize; }
+
+      /* ─── Toolbar ─── */
+      #toolbar {
+        position: fixed;
+        left: 16px;
+        top: 16px;
+        z-index: 10;
+        background: var(--panel);
+        border: 1px solid var(--border-strong);
+        border-radius: 14px;
+        padding: 12px 14px;
+        width: min(720px, calc(100vw - 32px));
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        box-shadow:
+          0 12px 40px rgba(0, 0, 0, 0.55),
+          0 0 0 0.5px rgba(255, 255, 255, 0.04) inset;
+      }
+
+      .toolbar-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .toolbar-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
+        background: linear-gradient(135deg, #2563eb 0%, #22d3ee 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        flex-shrink: 0;
+      }
+
+      .toolbar-title {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        flex: 1;
+      }
+
+      /* Mode badge */
+      #modeBadge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        font-size: 11.5px;
+        font-weight: 500;
+        border: 1px solid var(--border-strong);
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.04);
+        transition: all 0.2s ease;
+      }
+
+      #modeBadge.active {
+        border-color: rgba(34, 211, 238, 0.35);
+        background: rgba(34, 211, 238, 0.08);
+        color: var(--cyan);
+      }
+
+      /* ─── Button row ─── */
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-bottom: 9px;
+      }
+
+      button {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 7px 12px;
+        border-radius: 9px;
+        font-size: 13px;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+        letter-spacing: -0.01em;
+        transition: all 0.14s ease;
+        outline: none;
+        white-space: nowrap;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--border-strong);
+        color: var(--text);
+      }
+
+      button:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.18);
+        transform: translateY(-1px);
+      }
+
+      button:active { transform: scale(0.97); }
+
+      button.primary {
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+        border-color: rgba(59, 130, 246, 0.5);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.28);
+      }
+
+      button.primary:hover {
+        background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+        box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+      }
+
+      button.active {
+        background: rgba(34, 211, 238, 0.1);
+        border-color: rgba(34, 211, 238, 0.35);
+        color: var(--cyan);
+      }
+
+      button.active:hover {
+        background: rgba(34, 211, 238, 0.16);
+      }
+
+      button.close-btn {
+        background: var(--danger-dim);
+        border-color: var(--danger-border);
+        color: #fca5a5;
+      }
+
+      button.close-btn:hover {
+        background: rgba(239, 68, 68, 0.18);
+      }
+
+      /* ─── Info row ─── */
+      #info {
+        font-size: 12.5px;
+        color: var(--muted);
+        font-family: "SF Mono", Consolas, monospace;
+        letter-spacing: 0.01em;
+        line-height: 1.5;
+      }
+
+      .kbd {
+        display: inline-block;
+        padding: 1px 5px;
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 4px;
+        font-size: 11px;
+        background: rgba(255,255,255,0.05);
+        color: var(--muted);
+        font-family: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <div id="hole">
+        <div class="handle nw" data-handle="nw"></div>
+        <div class="handle ne" data-handle="ne"></div>
+        <div class="handle sw" data-handle="sw"></div>
+        <div class="handle se" data-handle="se"></div>
+        <div class="handle n"  data-handle="n"></div>
+        <div class="handle s"  data-handle="s"></div>
+        <div class="handle w"  data-handle="w"></div>
+        <div class="handle e"  data-handle="e"></div>
+      </div>
+    </div>
+
+    <div id="toolbar">
+      <div class="toolbar-top">
+        <div class="toolbar-icon">⬛</div>
+        <div class="toolbar-title">螢幕框選工具</div>
+        <div id="modeBadge" class="active">重選模式</div>
+      </div>
+      <div class="row">
+        <button id="reselectBtn" class="active">重選模式：開啟</button>
+        <button id="applyBtn" class="primary">儲存區域</button>
+        <button id="fullBtn">全螢幕</button>
+        <button id="maskBtn">切換遮罩</button>
+        <button id="closeBtn" class="close-btn">關閉</button>
+      </div>
+      <div id="info">讀取中...</div>
+    </div>
+
+    <script>
+      const stage = document.getElementById("stage");
+      const hole = document.getElementById("hole");
+      const info = document.getElementById("info");
+      const applyBtn = document.getElementById("applyBtn");
+      const fullBtn = document.getElementById("fullBtn");
+      const maskBtn = document.getElementById("maskBtn");
+      const closeBtn = document.getElementById("closeBtn");
+      const reselectBtn = document.getElementById("reselectBtn");
+      const modeBadge = document.getElementById("modeBadge");
+
+      const MIN_SIZE = 12;
+
+      let model = null;
+      let rect = { x: 0, y: 0, width: 400, height: 300 };
+      let drag = null;
+      let maskVisible = true;
+      let reselectMode = new URLSearchParams(window.location.search).get("reselect") === "1";
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function setInfo(text) {
+        info.textContent = text;
+      }
+
+      function applyRect() {
+        const maxW = window.innerWidth;
+        const maxH = window.innerHeight;
+
+        rect.x = clamp(rect.x, 0, Math.max(0, maxW - 1));
+        rect.y = clamp(rect.y, 0, Math.max(0, maxH - 1));
+        rect.width = clamp(rect.width, 1, Math.max(1, maxW - rect.x));
+        rect.height = clamp(rect.height, 1, Math.max(1, maxH - rect.y));
+
+        hole.style.left = `${rect.x}px`;
+        hole.style.top = `${rect.y}px`;
+        hole.style.width = `${rect.width}px`;
+        hole.style.height = `${rect.height}px`;
+        hole.setAttribute("data-dim", `${rect.width} × ${rect.height}`);
+
+        if (!reselectMode) {
+          setInfo(`目前區域：X ${rect.x}, Y ${rect.y}, W ${rect.width}, H ${rect.height}`);
+        }
+      }
+
+      function updateModeUi() {
+        document.body.classList.toggle("reselect", reselectMode);
+        reselectBtn.classList.toggle("active", reselectMode);
+        modeBadge.classList.toggle("active", reselectMode);
+        modeBadge.textContent = reselectMode ? "重選模式" : "調整模式";
+        reselectBtn.textContent = reselectMode ? "重選模式：開啟" : "按此重選區域";
+
+        if (reselectMode) {
+          setInfo("重選模式：按住滑鼠拖拉，即可直接畫出新區域。放開後可再微調或儲存。");
+        } else {
+          setInfo(`目前區域：X ${rect.x}, Y ${rect.y}, W ${rect.width}, H ${rect.height}`);
+        }
+      }
+
+      function setReselectMode(enabled) {
+        reselectMode = Boolean(enabled);
+        updateModeUi();
+      }
+
+      function toRect(region) {
+        return {
+          x: Number(region.x) || 0,
+          y: Number(region.y) || 0,
+          width: Number(region.width) || 1,
+          height: Number(region.height) || 1
+        };
+      }
+
+      function viewportToScreen(viewRect) {
+        const viewW = Math.max(1, window.innerWidth);
+        const viewH = Math.max(1, window.innerHeight);
+
+        return {
+          x: Math.round((viewRect.x / viewW) * model.screen.width),
+          y: Math.round((viewRect.y / viewH) * model.screen.height),
+          width: Math.max(1, Math.round((viewRect.width / viewW) * model.screen.width)),
+          height: Math.max(1, Math.round((viewRect.height / viewH) * model.screen.height))
+        };
+      }
+
+      function screenToViewport(screenRect) {
+        const viewW = Math.max(1, window.innerWidth);
+        const viewH = Math.max(1, window.innerHeight);
+
+        return {
+          x: Math.round((screenRect.x / model.screen.width) * viewW),
+          y: Math.round((screenRect.y / model.screen.height) * viewH),
+          width: Math.max(1, Math.round((screenRect.width / model.screen.width) * viewW)),
+          height: Math.max(1, Math.round((screenRect.height / model.screen.height) * viewH))
+        };
+      }
+
+      function startDrag(event, mode) {
+        if (event.button !== 0) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        drag = {
+          mode,
+          startX: event.clientX,
+          startY: event.clientY,
+          base: { ...rect },
+          pointerId: event.pointerId
+        };
+
+        stage.setPointerCapture(event.pointerId);
+
+        if (mode === "create") {
+          rect = {
+            x: event.clientX,
+            y: event.clientY,
+            width: 1,
+            height: 1
+          };
+          applyRect();
+        }
+      }
+
+      function updateDrag(event) {
+        if (!drag) {
+          return;
+        }
+
+        const dx = event.clientX - drag.startX;
+        const dy = event.clientY - drag.startY;
+        const base = drag.base;
+        let next = { ...base };
+
+        if (drag.mode === "create") {
+          next = {
+            x: Math.min(drag.startX, event.clientX),
+            y: Math.min(drag.startY, event.clientY),
+            width: Math.max(1, Math.abs(dx)),
+            height: Math.max(1, Math.abs(dy))
+          };
+        } else if (drag.mode === "move") {
+          next.x = base.x + dx;
+          next.y = base.y + dy;
+        } else {
+          if (drag.mode.includes("e")) next.width = base.width + dx;
+          if (drag.mode.includes("s")) next.height = base.height + dy;
+
+          if (drag.mode.includes("w")) {
+            next.x = base.x + dx;
+            next.width = base.width - dx;
+          }
+
+          if (drag.mode.includes("n")) {
+            next.y = base.y + dy;
+            next.height = base.height - dy;
+          }
+        }
+
+        next.width = Math.max(1, next.width);
+        next.height = Math.max(1, next.height);
+
+        if (next.x < 0) {
+          next.width += next.x;
+          next.x = 0;
+        }
+
+        if (next.y < 0) {
+          next.height += next.y;
+          next.y = 0;
+        }
+
+        if (next.x + next.width > window.innerWidth) {
+          next.width = window.innerWidth - next.x;
+        }
+
+        if (next.y + next.height > window.innerHeight) {
+          next.height = window.innerHeight - next.y;
+        }
+
+        rect = next;
+        applyRect();
+      }
+
+      function stopDrag() {
+        if (!drag) {
+          return;
+        }
+
+        const wasCreate = drag.mode === "create";
+        const pointerId = drag.pointerId;
+        drag = null;
+
+        if (stage.hasPointerCapture(pointerId)) {
+          stage.releasePointerCapture(pointerId);
+        }
+
+        if (wasCreate) {
+          if (rect.width < MIN_SIZE) {
+            rect.width = MIN_SIZE;
+          }
+          if (rect.height < MIN_SIZE) {
+            rect.height = MIN_SIZE;
+          }
+          applyRect();
+          setReselectMode(false);
+        }
+      }
+
+      async function applyRegion() {
+        if (!model || !model.screen) {
+          setInfo("Bridge 尚未啟動。");
+          return;
+        }
+
+        const response = await window.overlayApp.applyRegion(viewportToScreen(rect));
+        if (!response || !response.ok) {
+          setInfo(response && response.reason ? response.reason : "儲存失敗");
+          return;
+        }
+
+        const viewportRect = screenToViewport(response.region);
+        rect = viewportRect;
+        applyRect();
+        setInfo(`已儲存：X ${response.region.x}, Y ${response.region.y}, W ${response.region.width}, H ${response.region.height}`);
+      }
+
+      function setFullscreen() {
+        rect = {
+          x: 0,
+          y: 0,
+          width: window.innerWidth,
+          height: window.innerHeight
+        };
+        applyRect();
+        setReselectMode(false);
+      }
+
+      function toggleMask() {
+        maskVisible = !maskVisible;
+        hole.style.boxShadow = maskVisible
+          ? "0 0 0 99999px rgba(4, 9, 22, 0.56), 0 0 24px rgba(34, 211, 238, 0.12), inset 0 0 40px rgba(34, 211, 238, 0.04)"
+          : "none";
+        maskBtn.textContent = maskVisible ? "切換遮罩" : "顯示遮罩";
+      }
+
+      hole.addEventListener("pointerdown", (event) => {
+        if (reselectMode) {
+          startDrag(event, "create");
+          return;
+        }
+
+        const mode = event.target.getAttribute("data-handle") || "move";
+        startDrag(event, mode);
+      });
+
+      stage.addEventListener("pointerdown", (event) => {
+        if (event.target !== stage && !reselectMode) {
+          return;
+        }
+
+        startDrag(event, "create");
+      });
+
+      stage.addEventListener("pointermove", updateDrag);
+      stage.addEventListener("pointerup", stopDrag);
+      stage.addEventListener("pointercancel", stopDrag);
+
+      applyBtn.addEventListener("click", applyRegion);
+      fullBtn.addEventListener("click", setFullscreen);
+      maskBtn.addEventListener("click", toggleMask);
+      closeBtn.addEventListener("click", () => window.overlayApp.close());
+
+      reselectBtn.addEventListener("click", () => {
+        setReselectMode(!reselectMode);
+      });
+
+      window.addEventListener("keydown", async (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          await applyRegion();
+          return;
+        }
+
+        if (event.key === "Escape") {
+          event.preventDefault();
+          window.overlayApp.close();
+          return;
+        }
+
+        if (event.key.toLowerCase() === "r") {
+          event.preventDefault();
+          setReselectMode(!reselectMode);
+        }
+      });
+
+      window.addEventListener("resize", () => {
+        if (!model || !model.screen) {
+          applyRect();
+          return;
+        }
+
+        const screenRect = viewportToScreen(rect);
+        rect = screenToViewport(screenRect);
+        applyRect();
+      });
+
+      async function init() {
+        model = await window.overlayApp.getModel();
+        if (!model) {
+          setInfo("Bridge 尚未啟動。");
+          return;
+        }
+
+        rect = screenToViewport(toRect(model.region));
+        applyRect();
+        updateModeUi();
+      }
+
+      init().catch((error) => {
+        setInfo(error && error.message ? error.message : "初始化失敗");
+      });
+    </script>
+  </body>
+</html>

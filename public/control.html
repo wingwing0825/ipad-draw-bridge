@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>iPad Draw Bridge 控制台</title>
+    <style>
+      :root {
+        --bg: #060d1c;
+        --surface: #0b1627;
+        --card: #0f1e32;
+        --card-hover: #11223a;
+        --border: rgba(255, 255, 255, 0.07);
+        --border-strong: rgba(255, 255, 255, 0.12);
+        --text: #f1f5f9;
+        --muted: #8b9ab5;
+        --subtle: rgba(139, 154, 181, 0.55);
+        --accent: #3b82f6;
+        --accent-dim: rgba(59, 130, 246, 0.15);
+        --accent-border: rgba(59, 130, 246, 0.35);
+        --cyan: #22d3ee;
+        --good: #10b981;
+        --good-dim: rgba(16, 185, 129, 0.12);
+        --warn: #f59e0b;
+        --warn-dim: rgba(245, 158, 11, 0.12);
+        --danger: #ef4444;
+        --danger-dim: rgba(239, 68, 68, 0.1);
+        --danger-border: rgba(239, 68, 68, 0.3);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Text",
+          "PingFang TC", "Microsoft JhengHei", sans-serif;
+        padding: 28px 20px 48px;
+        line-height: 1;
+      }
+
+      /* ─── Layout ─── */
+      .wrap {
+        max-width: 860px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      /* ─── Cards ─── */
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px 22px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+      }
+
+      /* ─── Header card ─── */
+      .header-card {
+        background: linear-gradient(135deg, #0d1e38 0%, #0b1627 100%);
+        border-color: rgba(59, 130, 246, 0.15);
+      }
+
+      .header-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+
+      .app-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 11px;
+        background: linear-gradient(135deg, #2563eb 0%, #22d3ee 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        flex-shrink: 0;
+        box-shadow: 0 4px 14px rgba(34, 211, 238, 0.25);
+      }
+
+      .app-info h1 {
+        margin: 0 0 2px;
+        font-size: 18px;
+        font-weight: 650;
+        letter-spacing: -0.03em;
+        color: var(--text);
+      }
+
+      .app-info p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 11px;
+        border: 1px solid var(--border-strong);
+        border-radius: 999px;
+        font-size: 12.5px;
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.04);
+        letter-spacing: -0.01em;
+      }
+
+      .chip::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--cyan);
+        flex-shrink: 0;
+        box-shadow: 0 0 6px var(--cyan);
+      }
+
+      /* ─── Section titles ─── */
+      .section-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin: 0 0 14px;
+      }
+
+      /* ─── Coordinate grid ─── */
+      .coord-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      label {
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--subtle);
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      input[type="number"] {
+        width: 100%;
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid var(--border-strong);
+        border-radius: 10px;
+        padding: 9px 11px;
+        font-size: 14px;
+        font-weight: 500;
+        font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+        letter-spacing: -0.01em;
+        appearance: textfield;
+        -moz-appearance: textfield;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      input[type="number"]::-webkit-inner-spin-button,
+      input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+
+      input[type="number"]:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-dim);
+      }
+
+      /* ─── Actions ─── */
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+
+      button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 9px 15px;
+        border-radius: 10px;
+        font-size: 13.5px;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+        letter-spacing: -0.01em;
+        transition: all 0.15s ease;
+        outline: none;
+        white-space: nowrap;
+      }
+
+      button:active {
+        transform: scale(0.97);
+      }
+
+      /* Primary */
+      button.primary {
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+        border: 1px solid rgba(59, 130, 246, 0.5);
+        color: #fff;
+        box-shadow: 0 2px 10px rgba(59, 130, 246, 0.25);
+      }
+
+      button.primary:hover {
+        background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.35);
+        transform: translateY(-1px);
+      }
+
+      /* Secondary */
+      button.secondary {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-strong);
+        color: var(--text);
+      }
+
+      button.secondary:hover {
+        background: rgba(255, 255, 255, 0.09);
+        border-color: rgba(255, 255, 255, 0.18);
+        transform: translateY(-1px);
+      }
+
+      /* Danger */
+      button.warn {
+        background: var(--danger-dim);
+        border: 1px solid var(--danger-border);
+        color: #fca5a5;
+      }
+
+      button.warn:hover {
+        background: rgba(239, 68, 68, 0.18);
+        transform: translateY(-1px);
+      }
+
+      /* ─── Status message ─── */
+      .status-wrap {
+        min-height: 22px;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+
+      .status::before {
+        content: '';
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: var(--muted);
+      }
+
+      .status.good {
+        color: var(--good);
+      }
+      .status.good::before {
+        background: var(--good);
+        box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+      }
+
+      .status.warn {
+        color: var(--warn);
+      }
+      .status.warn::before {
+        background: var(--warn);
+        box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+      }
+
+      /* ─── Preview ─── */
+      .preview-label {
+        font-size: 12px;
+        color: var(--subtle);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .preview-label::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+
+      .preview {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border: 1px solid var(--border-strong);
+        border-radius: 12px;
+        background: linear-gradient(180deg, #0b1828 0%, #070f1c 100%);
+        overflow: hidden;
+        cursor: crosshair;
+      }
+
+      /* Subtle dot grid inside preview */
+      .preview::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(circle, rgba(148, 163, 184, 0.15) 1px, transparent 1px);
+        background-size: 20px 20px;
+        pointer-events: none;
+      }
+
+      .preview .region {
+        position: absolute;
+        border: 2px solid var(--cyan);
+        background: rgba(34, 211, 238, 0.1);
+        border-radius: 3px;
+        box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.2), inset 0 0 20px rgba(34, 211, 238, 0.05);
+      }
+
+      .preview-hint {
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--subtle);
+        line-height: 1.5;
+      }
+
+      /* ─── Responsive ─── */
+      @media (max-width: 600px) {
+        body { padding: 16px 14px 40px; }
+        .coord-grid { grid-template-columns: repeat(2, 1fr); }
+        .card { padding: 16px 16px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+
+      <!-- Header -->
+      <section class="card header-card">
+        <div class="header-top">
+          <div class="app-icon">✏️</div>
+          <div class="app-info">
+            <h1>iPad Draw Bridge</h1>
+            <p>設定可畫區域，讓 iPad 筆跡精確對應到電腦畫布</p>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="chip" id="screenChip">螢幕：讀取中...</div>
+          <div class="chip" id="modeChip">模式：讀取中...</div>
+        </div>
+      </section>
+
+      <!-- Region Settings -->
+      <section class="card">
+        <div class="section-title">可畫區域設定</div>
+        <div class="coord-grid">
+          <div class="field-group">
+            <label for="x">X 座標</label>
+            <input id="x" type="number" min="0" step="1" />
+          </div>
+          <div class="field-group">
+            <label for="y">Y 座標</label>
+            <input id="y" type="number" min="0" step="1" />
+          </div>
+          <div class="field-group">
+            <label for="width">寬度</label>
+            <input id="width" type="number" min="1" step="1" />
+          </div>
+          <div class="field-group">
+            <label for="height">高度</label>
+            <input id="height" type="number" min="1" step="1" />
+          </div>
+        </div>
+        <div class="actions">
+          <button class="primary" id="saveBtn">套用區域</button>
+          <button class="secondary" id="overlayBtn">螢幕框選工具</button>
+          <button class="secondary" id="fullBtn">重設全螢幕</button>
+          <button class="warn" id="releaseBtn">解卡住（放開滑鼠）</button>
+        </div>
+        <div class="status-wrap">
+          <div id="status" class="status"></div>
+        </div>
+      </section>
+
+      <!-- Preview -->
+      <section class="card">
+        <div class="section-title">區域預覽</div>
+        <div class="preview-label">螢幕縮圖｜藍框 = 實際可畫區域</div>
+        <div class="preview" id="preview">
+          <div class="region" id="region"></div>
+        </div>
+        <div class="preview-hint">可直接在預覽區域拖曳框選，再按「套用區域」確認。</div>
+      </section>
+
+    </main>
+
+    <script>
+      const screenChip = document.getElementById("screenChip");
+      const modeChip = document.getElementById("modeChip");
+      const statusEl = document.getElementById("status");
+      const regionEl = document.getElementById("region");
+      const previewEl = document.getElementById("preview");
+
+      const fields = {
+        x: document.getElementById("x"),
+        y: document.getElementById("y"),
+        width: document.getElementById("width"),
+        height: document.getElementById("height")
+      };
+
+      let config = null;
+      let dragState = null;
+
+      function setStatus(text, mode = "good") {
+        statusEl.textContent = text;
+        statusEl.className = `status ${mode}`;
+      }
+
+      function fillRegion(region) {
+        fields.x.value = region.x;
+        fields.y.value = region.y;
+        fields.width.value = region.width;
+        fields.height.value = region.height;
+      }
+
+      function getCurrentFormRegion() {
+        return {
+          x: Number(fields.x.value),
+          y: Number(fields.y.value),
+          width: Number(fields.width.value),
+          height: Number(fields.height.value)
+        };
+      }
+
+      function updatePreview() {
+        if (!config || !config.screen) {
+          return;
+        }
+        const region = getCurrentFormRegion();
+        const pw = previewEl.clientWidth;
+        const ph = previewEl.clientHeight;
+        const sx = pw / config.screen.width;
+        const sy = ph / config.screen.height;
+
+        const x = Math.max(0, region.x * sx);
+        const y = Math.max(0, region.y * sy);
+        const w = Math.max(1, region.width * sx);
+        const h = Math.max(1, region.height * sy);
+
+        regionEl.style.left = `${x}px`;
+        regionEl.style.top = `${y}px`;
+        regionEl.style.width = `${w}px`;
+        regionEl.style.height = `${h}px`;
+      }
+
+      function applyDragSelection(startX, startY, endX, endY) {
+        if (!config || !config.screen) {
+          return;
+        }
+
+        const pw = previewEl.clientWidth;
+        const ph = previewEl.clientHeight;
+
+        const minX = Math.max(0, Math.min(startX, endX));
+        const minY = Math.max(0, Math.min(startY, endY));
+        const maxX = Math.min(pw, Math.max(startX, endX));
+        const maxY = Math.min(ph, Math.max(startY, endY));
+
+        const x = Math.round((minX / pw) * config.screen.width);
+        const y = Math.round((minY / ph) * config.screen.height);
+        const width = Math.max(1, Math.round(((maxX - minX) / pw) * config.screen.width));
+        const height = Math.max(1, Math.round(((maxY - minY) / ph) * config.screen.height));
+
+        fillRegion({ x, y, width, height });
+        updatePreview();
+      }
+
+      async function fetchConfig() {
+        const res = await fetch("/api/config");
+        if (!res.ok) {
+          throw new Error("無法讀取設定");
+        }
+        config = await res.json();
+        screenChip.textContent = `螢幕：${config.screen.width} x ${config.screen.height}`;
+
+        const activeRegion = config.region || {
+          x: 0,
+          y: 0,
+          width: config.screen.width,
+          height: config.screen.height
+        };
+        fillRegion(activeRegion);
+
+        modeChip.textContent = config.region ? "模式：區域鎖定" : "模式：全螢幕";
+        updatePreview();
+      }
+
+      async function saveRegion() {
+        const body = getCurrentFormRegion();
+        const res = await fetch("/api/region", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "儲存失敗");
+        }
+
+        config = { ...config, region: data.region };
+        modeChip.textContent = "模式：區域鎖定";
+        fillRegion(data.region);
+        updatePreview();
+        setStatus("已儲存，可畫區域已鎖定。", "good");
+      }
+
+      async function setFullscreenRegion() {
+        const res = await fetch("/api/region", { method: "DELETE" });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error("切換全螢幕失敗");
+        }
+        await fetchConfig();
+        setStatus("已切換為全螢幕映射。", "warn");
+      }
+
+      async function forceRelease() {
+        const res = await fetch("/api/release", { method: "POST" });
+        if (!res.ok) {
+          throw new Error("解鎖失敗");
+        }
+        setStatus("已發送放開滑鼠指令。", "good");
+      }
+
+      Object.values(fields).forEach((input) => {
+        input.addEventListener("input", updatePreview);
+      });
+
+      document.getElementById("saveBtn").addEventListener("click", async () => {
+        try {
+          await saveRegion();
+        } catch (error) {
+          setStatus(error.message, "warn");
+        }
+      });
+
+      document.getElementById("fullBtn").addEventListener("click", async () => {
+        try {
+          await setFullscreenRegion();
+        } catch (error) {
+          setStatus(error.message, "warn");
+        }
+      });
+
+      document.getElementById("releaseBtn").addEventListener("click", async () => {
+        try {
+          await forceRelease();
+        } catch (error) {
+          setStatus(error.message, "warn");
+        }
+      });
+
+      document.getElementById("overlayBtn").addEventListener("click", () => {
+        window.open("/overlay", "_blank", "width=1400,height=900");
+      });
+
+      previewEl.addEventListener("pointerdown", (event) => {
+        if (!config || !config.screen) {
+          return;
+        }
+        const rect = previewEl.getBoundingClientRect();
+        dragState = {
+          rect,
+          startX: event.clientX - rect.left,
+          startY: event.clientY - rect.top
+        };
+        previewEl.setPointerCapture(event.pointerId);
+        applyDragSelection(dragState.startX, dragState.startY, dragState.startX, dragState.startY);
+      });
+
+      previewEl.addEventListener("pointermove", (event) => {
+        if (!dragState) {
+          return;
+        }
+        const endX = event.clientX - dragState.rect.left;
+        const endY = event.clientY - dragState.rect.top;
+        applyDragSelection(dragState.startX, dragState.startY, endX, endY);
+      });
+
+      function finishDrag(event) {
+        if (!dragState) {
+          return;
+        }
+        const endX = event.clientX - dragState.rect.left;
+        const endY = event.clientY - dragState.rect.top;
+        applyDragSelection(dragState.startX, dragState.startY, endX, endY);
+        dragState = null;
+      }
+
+      previewEl.addEventListener("pointerup", finishDrag);
+      previewEl.addEventListener("pointercancel", () => {
+        dragState = null;
+      });
+
+      window.addEventListener("resize", updatePreview);
+
+      fetchConfig().catch((error) => {
+        setStatus(error.message, "warn");
+      });
+    </script>
+  </body>
+</html>

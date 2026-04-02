@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>iPad Draw Bridge</title>
+    <style>
+      :root {
+        --bg: #060d1c;
+        --surface: #0b1627;
+        --card: #0f1e32;
+        --border: rgba(255, 255, 255, 0.07);
+        --border-strong: rgba(255, 255, 255, 0.11);
+        --text: #f1f5f9;
+        --muted: #8b9ab5;
+        --subtle: rgba(139, 154, 181, 0.5);
+        --accent: #3b82f6;
+        --cyan: #22d3ee;
+        --ok: #10b981;
+        --ok-dim: rgba(16, 185, 129, 0.12);
+        --ok-border: rgba(16, 185, 129, 0.3);
+        --warn: #f59e0b;
+        --warn-dim: rgba(245, 158, 11, 0.1);
+        --warn-border: rgba(245, 158, 11, 0.3);
+        --danger: #ef4444;
+        --danger-dim: rgba(239, 68, 68, 0.1);
+        --danger-border: rgba(239, 68, 68, 0.28);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(ellipse 900px 500px at 5% -5%, rgba(30, 64, 120, 0.45) 0%, transparent 55%),
+          radial-gradient(ellipse 700px 400px at 95% -5%, rgba(16, 100, 80, 0.3) 0%, transparent 55%),
+          var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Text",
+          "PingFang TC", "Microsoft JhengHei", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ─── Layout ─── */
+      .shell {
+        max-width: 1060px;
+        margin: 0 auto;
+        padding: 24px 22px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      /* ─── Header ─── */
+      .header {
+        background: linear-gradient(130deg, rgba(15, 30, 58, 0.95) 0%, rgba(10, 20, 40, 0.92) 100%);
+        border: 1px solid rgba(59, 130, 246, 0.15);
+        border-radius: 18px;
+        padding: 20px 22px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .header-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 13px;
+        background: linear-gradient(135deg, #2563eb 0%, #22d3ee 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        flex-shrink: 0;
+        box-shadow: 0 4px 18px rgba(34, 211, 238, 0.22);
+      }
+
+      .header-text { flex: 1; }
+
+      .header-text h1 {
+        margin: 0 0 3px;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        color: var(--text);
+      }
+
+      .header-text p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+
+      /* Status chip */
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        font-weight: 500;
+        border: 1px solid var(--border-strong);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        flex-shrink: 0;
+        transition: all 0.25s ease;
+      }
+
+      .chip::before {
+        content: '';
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--muted);
+        flex-shrink: 0;
+      }
+
+      .chip.ok {
+        border-color: var(--ok-border);
+        background: var(--ok-dim);
+        color: var(--ok);
+      }
+      .chip.ok::before {
+        background: var(--ok);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        animation: pulse-ok 2.5s ease-in-out infinite;
+      }
+
+      .chip.bad {
+        border-color: rgba(239, 68, 68, 0.25);
+        background: var(--danger-dim);
+        color: #fca5a5;
+      }
+      .chip.bad::before {
+        background: var(--danger);
+      }
+
+      @keyframes pulse-ok {
+        0%, 100% { box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+        50%       { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.04); }
+      }
+
+      /* ─── Cards ─── */
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 18px 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+      }
+
+      .card h2 {
+        margin: 0 0 14px;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: var(--text);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1.15fr 1fr;
+        gap: 14px;
+      }
+
+      /* ─── URL Box ─── */
+      .url-box {
+        width: 100%;
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid var(--border-strong);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+        font-size: 12.5px;
+        letter-spacing: 0.01em;
+        outline: none;
+        margin-bottom: 12px;
+        transition: border-color 0.15s ease;
+      }
+
+      .url-box:focus {
+        border-color: var(--accent);
+      }
+
+      /* ─── Buttons ─── */
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      button {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 8px 14px;
+        border-radius: 9px;
+        font-size: 13px;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+        letter-spacing: -0.01em;
+        transition: all 0.14s ease;
+        outline: none;
+        white-space: nowrap;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-strong);
+        color: var(--text);
+      }
+
+      button:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.09);
+        border-color: rgba(255, 255, 255, 0.18);
+        transform: translateY(-1px);
+      }
+
+      button:active:not(:disabled) {
+        transform: scale(0.97);
+      }
+
+      button:disabled {
+        opacity: 0.38;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+
+      button.primary {
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+        border-color: rgba(59, 130, 246, 0.5);
+        color: #fff;
+        box-shadow: 0 2px 10px rgba(59, 130, 246, 0.25);
+      }
+      button.primary:hover:not(:disabled) {
+        background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.35);
+      }
+
+      button.good {
+        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+        border-color: rgba(16, 185, 129, 0.45);
+        color: #fff;
+        box-shadow: 0 2px 10px rgba(16, 185, 129, 0.2);
+      }
+      button.good:hover:not(:disabled) {
+        background: linear-gradient(135deg, #047857 0%, #059669 100%);
+        box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+      }
+
+      button.warn {
+        background: linear-gradient(135deg, #b45309 0%, #f59e0b 100%);
+        border-color: rgba(245, 158, 11, 0.45);
+        color: #fff;
+        box-shadow: 0 2px 10px rgba(245, 158, 11, 0.15);
+      }
+      button.warn:hover:not(:disabled) {
+        background: linear-gradient(135deg, #92400e 0%, #b45309 100%);
+      }
+
+      button.danger {
+        background: linear-gradient(135deg, #991b1b 0%, #ef4444 100%);
+        border-color: var(--danger-border);
+        color: #fff;
+        box-shadow: 0 2px 10px rgba(239, 68, 68, 0.18);
+      }
+      button.danger:hover:not(:disabled) {
+        background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
+      }
+
+      /* ─── Key-value pairs ─── */
+      .kvs {
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        gap: 9px 14px;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+      }
+
+      .key {
+        font-size: 12px;
+        color: var(--subtle);
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        align-self: center;
+      }
+
+      .value {
+        font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+        font-size: 12px;
+        word-break: break-all;
+        color: var(--muted);
+        align-self: center;
+      }
+
+      /* ─── Warning note ─── */
+      .warn-note {
+        margin-top: 14px;
+        padding: 11px 13px;
+        border-radius: 10px;
+        border: 1px solid var(--warn-border);
+        background: var(--warn-dim);
+        color: #fcd34d;
+        font-size: 12.5px;
+        line-height: 1.55;
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+      }
+
+      .warn-note::before {
+        content: '⚠';
+        flex-shrink: 0;
+        margin-top: 0.5px;
+      }
+
+      /* ─── Toggle ─── */
+      .toggle-row {
+        margin-top: 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        color: var(--muted);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .toggle-row input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        accent-color: var(--accent);
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      /* ─── Region card ─── */
+      .region-card {
+        grid-column: 1 / -1;
+      }
+
+      /* ─── Responsive ─── */
+      @media (max-width: 860px) {
+        .grid { grid-template-columns: 1fr; }
+      }
+
+      @media (max-width: 540px) {
+        .shell { padding: 14px 14px 32px; }
+        .header { flex-direction: column; align-items: flex-start; }
+        .header h1 { font-size: 18px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+
+      <!-- Header -->
+      <section class="header">
+        <div class="header-icon">✏️</div>
+        <div class="header-text">
+          <h1>iPad Draw Bridge</h1>
+          <p>在 Windows 設定可畫區域，iPad（Apple Pencil）會映射成滑鼠輸入。</p>
+        </div>
+        <div id="stateChip" class="chip">讀取中...</div>
+      </section>
+
+      <!-- Main Grid -->
+      <div class="grid">
+
+        <!-- iPad Connection Card -->
+        <div class="card">
+          <h2>iPad 連線</h2>
+          <input id="drawUrl" class="url-box" readonly value="讀取中..." />
+          <div class="actions">
+            <button id="copyUrlBtn" class="good">複製 iPad URL</button>
+            <button id="openUrlBtn">打開 URL</button>
+            <button id="regenBtn" class="warn">重設配對 Token</button>
+          </div>
+        </div>
+
+        <!-- Server Control Card -->
+        <div class="card">
+          <h2>Server 控制</h2>
+          <div class="actions">
+            <button id="startBtn" class="good">啟動 Server</button>
+            <button id="stopBtn" class="danger">停止 Server</button>
+          </div>
+          <div class="kvs">
+            <div class="key">Pair Token</div>
+            <div id="tokenValue" class="value">—</div>
+            <div class="key">Control URL</div>
+            <div id="controlValue" class="value">—</div>
+            <div class="key">Overlay URL</div>
+            <div id="overlayValue" class="value">—</div>
+          </div>
+          <div class="warn-note">iPad 連線必須含 Token。請只在可信任區網使用，必要時重設 Token。</div>
+        </div>
+
+        <!-- Region Card (full width) -->
+        <div class="card region-card">
+          <h2>可畫區域與輸入</h2>
+          <div class="actions">
+            <button id="overlayBtn" class="primary">按此重選區域（自由拖拉）</button>
+            <button id="clearRegionBtn">清除區域（回全螢幕）</button>
+            <button id="releaseBtn" class="warn">一鍵解卡住（Mouse Up）</button>
+          </div>
+          <label class="toggle-row" for="previewToggle">
+            <input id="previewToggle" type="checkbox" />
+            顯示 iPad 本地筆跡預覽（取消勾選：iPad 不顯示）
+          </label>
+        </div>
+
+      </div>
+    </main>
+
+    <script>
+      let latestStatus = { running: false };
+      let updatingPreviewToggle = false;
+
+      const stateChip = document.getElementById("stateChip");
+      const drawUrlInput = document.getElementById("drawUrl");
+      const tokenValue = document.getElementById("tokenValue");
+      const controlValue = document.getElementById("controlValue");
+      const overlayValue = document.getElementById("overlayValue");
+      const previewToggle = document.getElementById("previewToggle");
+
+      const overlayBtn = document.getElementById("overlayBtn");
+      const clearRegionBtn = document.getElementById("clearRegionBtn");
+      const releaseBtn = document.getElementById("releaseBtn");
+      const copyUrlBtn = document.getElementById("copyUrlBtn");
+      const openUrlBtn = document.getElementById("openUrlBtn");
+      const regenBtn = document.getElementById("regenBtn");
+
+      function setControlsEnabled(running) {
+        overlayBtn.disabled = !running;
+        clearRegionBtn.disabled = !running;
+        releaseBtn.disabled = !running;
+        copyUrlBtn.disabled = !running;
+        openUrlBtn.disabled = !running;
+        regenBtn.disabled = !running;
+        previewToggle.disabled = !running;
+      }
+
+      function render(status) {
+        latestStatus = status || { running: false };
+
+        if (!latestStatus.running) {
+          stateChip.textContent = "Server 未啟動";
+          stateChip.className = "chip bad";
+          drawUrlInput.value = "Server 未啟動";
+          tokenValue.textContent = "—";
+          controlValue.textContent = "—";
+          overlayValue.textContent = "—";
+          updatingPreviewToggle = true;
+          previewToggle.checked = true;
+          updatingPreviewToggle = false;
+          setControlsEnabled(false);
+          return;
+        }
+
+        stateChip.textContent = "Server 運行中";
+        stateChip.className = "chip ok";
+        drawUrlInput.value = latestStatus.primaryDrawUrl || "";
+        tokenValue.textContent = latestStatus.token || "—";
+        controlValue.textContent = `http://localhost:${latestStatus.port}/control`;
+        overlayValue.textContent = `http://localhost:${latestStatus.port}/overlay`;
+        updatingPreviewToggle = true;
+        previewToggle.checked = latestStatus.previewEnabled !== false;
+        updatingPreviewToggle = false;
+        setControlsEnabled(true);
+      }
+
+      async function refreshStatus() {
+        const status = await window.bridgeApp.getStatus();
+        render(status);
+      }
+
+      window.bridgeApp.onStatus((status) => {
+        render(status);
+      });
+
+      copyUrlBtn.addEventListener("click", async () => {
+        if (!latestStatus.running) return;
+        await window.bridgeApp.copyText(latestStatus.primaryDrawUrl || "");
+      });
+
+      openUrlBtn.addEventListener("click", async () => {
+        if (!latestStatus.running) return;
+        await window.bridgeApp.openExternal(latestStatus.primaryDrawUrl || "");
+      });
+
+      overlayBtn.addEventListener("click", async () => {
+        if (!latestStatus.running) return;
+        await window.bridgeApp.openOverlay({ reselect: true });
+      });
+
+      clearRegionBtn.addEventListener("click", async () => {
+        if (!latestStatus.running) return;
+        await window.bridgeApp.clearRegion();
+        await refreshStatus();
+      });
+
+      releaseBtn.addEventListener("click", async () => {
+        if (!latestStatus.running) return;
+        await window.bridgeApp.releasePointer();
+      });
+
+      previewToggle.addEventListener("change", async () => {
+        if (!latestStatus.running || updatingPreviewToggle) {
+          return;
+        }
+        await window.bridgeApp.setPreviewEnabled(previewToggle.checked);
+      });
+
+      document.getElementById("startBtn").addEventListener("click", async () => {
+        const status = await window.bridgeApp.start();
+        render(status);
+      });
+
+      document.getElementById("stopBtn").addEventListener("click", async () => {
+        const status = await window.bridgeApp.stop();
+        render(status);
+      });
+
+      regenBtn.addEventListener("click", async () => {
+        const status = await window.bridgeApp.regenerateToken();
+        render(status);
+      });
+
+      refreshStatus().catch(() => {
+        render({ running: false });
+      });
+    </script>
+  </body>
+</html>
